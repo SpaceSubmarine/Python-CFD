@@ -2,18 +2,17 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # INPUT SECTION
-r = 6.5  # radius in (m)
-v = 2  #velocity in (m/s)
+r = 3  # radius in (m)
+v = 2  # velocity in (m/s)
 dens = 1025  # density of the seawater
 H = 20  # height of the chanel in (m)
 L = 50  # longitude of the chanel in (m)
-tol = 0.5  # tolerance of the mesh
-v_in = v  # inlet velocity (m/s)
-max_iter = 2000  # maximum number of iterations in the gauss-seidel
+tol = 1  # tolerance of the mesh
+v_in = v  # inlet velocity (m/s) in x-axis
+max_iter = 100  # maximum number of iterations in the gauss-seidel
 max_difFer = 1e-6
 
-multi_cyl = False
-
+multi_cyl = True
 
 # MESH DEFINITION
 dx = tol  # differential x
@@ -45,32 +44,23 @@ px = int(round((N + 2) / 2))
 # initializing bP coefficient
 bP = np.zeros_like(M_fluid)
 
-# definition of the solid cylinder and applying the bP inside
-'''for j in range(px - int(r / dx), px + int(r / dx)):
-    for i in range(py - int(r / dy), py + int(r / dy)):
-        if np.sqrt((x[i, j] - x[py, px]) ** 2 + (y[i, j] - y[py, px]) ** 2) < r:
-            M_fluid[i, j] = 0
-            bP[i, j] = v * H / 2
-
-'''
-
 if multi_cyl == True:
-    Cx = L/2
-    Cy = H/3
+    Cx = L / 2
+    Cy = H / 3
 
-    for i in range(M+2):
-        for j in range(N+2):
-            R = np.sqrt((x[i, j] - Cx)**2 + (y[i, j] - Cy)**2)
+    for i in range(M + 2):
+        for j in range(N + 2):
+            R = np.sqrt((x[i, j] - Cx) ** 2 + (y[i, j] - Cy) ** 2)
             if R < r:
                 M_fluid[i, j] = 0
                 bP[i, j] = v * H / 2
 
-    Cx = (L/3)*2
-    Cy = (H/3)*2
+    Cx = (L / 3) * 2
+    Cy = (H / 3) * 2
 
-    for i in range(M+2):
-        for j in range(N+2):
-            R = np.sqrt((x[i, j] - Cx)**2 + (y[i, j] - Cy)**2)
+    for i in range(M + 2):
+        for j in range(N + 2):
+            R = np.sqrt((x[i, j] - Cx) ** 2 + (y[i, j] - Cy) ** 2)
             if R < r:
                 M_fluid[i, j] = 0
                 bP[i, j] = v * H / 2
@@ -85,7 +75,6 @@ else:
             if R < r:
                 M_fluid[i, j] = 0
                 bP[i, j] = v * H / 2
-
 
 # INITIALIZING COEFFICIENTS
 ae = np.ones_like(M_fluid)
@@ -181,11 +170,10 @@ while differ > max_difFer and Iter < max_iter:
     dif_list.append(differ)
     print(Iter, ": ", differ)
 
-
 # CHECK
 PSI[:, -1] = PSI[:, -2]
 
-vxP = v * M_fluid
+vxP = np.zeros(M_fluid.shape)
 vyP = np.zeros(M_fluid.shape)
 vP = v * M_fluid
 vxn = np.ones(M_fluid.shape)
@@ -193,46 +181,52 @@ vxs = np.ones(M_fluid.shape)
 vye = np.ones(M_fluid.shape)
 vyw = np.ones(M_fluid.shape)
 
-
 # VELOCITY COMPUTATION
-for i in range(2, M + 1):
-    for j in range(2, N + 1):
+for i in range(1, M + 1):
+    for j in range(1, N + 1):
         if M_fluid[i, j] == 1:
-            vxn = an[i, j] * ((PSI[i - 1, j] - PSI[i, j]) / dPN)
-            vxs = -as_[i, j] * (PSI[i+1, j] - PSI[i, j]) / dPS
-            vye = ae[i, j] * (PSI[i, j + 1] - PSI[i, j]) / dPE
-            vyw = -aw[i, j] * (PSI[i-1, j] - PSI[i, j]) / dPW
-            vxP[i, j] = (vxn + vxs) / 2
-            vyP[i, j] = (vye + vyw) / 2
+            vxn = an[i, j] * ((PSI[i, j] - PSI[i-1, j]) / dPN)
+            vxs = as_[i, j] * ((PSI[i+1, j] - PSI[i, j]) / dPS)
+            vye = ae[i, j] * ((PSI[i, j + 1] - PSI[i, j]) / dPE)
+            vyw = aw[i, j] * ((PSI[i, j] - PSI[i, j-1]) / dPW)
+            vxP[i, j] = -(vxn + vxs) / 2
+            vyP[i, j] = -(vye + vyw) / 2
             vP[i, j] = np.sqrt(vxP[i, j] ** 2 + vyP[i, j] ** 2)
-
 
 PSI = PSI * M_fluid
 
 # PLOT SECTION
 plt.style.use("dark_background")
-plt.imshow(PSI, aspect='auto', interpolation='none', cmap='jet')
+
+'''plt.streamplot(x, y, vxP, vyP, color=vP, cmap='jet')
+plt.colorbar()
+plt.show()'''
+
+#solucionar el plot
+plt.imshow(vP, aspect='auto', interpolation='gaussian', cmap='inferno', alpha=0.7)
+plt.quiver(x, y, vxP, vyP, color='w', alpha=1, angles='xy')
+plt.show()
+
+
+plt.imshow(PSI, aspect='auto', interpolation='gaussian', cmap='inferno')
 plt.autoscale()
 plt.colorbar()
 plt.xlabel('Control Volumes')
 plt.show()
 
-plt.style.use("dark_background")
-plt.imshow(vP, aspect='auto', interpolation='none', cmap='turbo')
+plt.imshow(M_fluid, aspect='auto', interpolation='none', cmap='autumn')
 plt.autoscale()
 plt.colorbar()
 plt.xlabel('Control Volumes')
 plt.show()
 
-plt.style.use("dark_background")
-plt.imshow(M_fluid, aspect='auto', interpolation='none', cmap='bone')
+plt.imshow(vyP, aspect='auto', interpolation='none', cmap='autumn')
 plt.autoscale()
 plt.colorbar()
 plt.xlabel('Control Volumes')
-plt.show()
-
-plt.quiver(vxP, vyP)
 plt.show()
 
 plt.plot(iter_list, dif_list)
+plt.xlabel('Iterations')
+plt.ylabel('Error')
 plt.show()
