@@ -7,12 +7,16 @@ v = 2  # velocity in (m/s)
 dens = 1025  # density of the seawater
 H = 20  # height of the chanel in (m)
 L = 50  # longitude of the chanel in (m)
-tol = 1  # tolerance of the mesh
+tol = 0.5  # tolerance of the mesh
 v_in = v  # inlet velocity (m/s) in x-axis
-max_iter = 100  # maximum number of iterations in the gauss-seidel
+max_iter = 1000  # maximum number of iterations in the gauss-seidel
 max_difFer = 1e-6
-
+time = 10  # sec
+delta_t = 20  # number of divisions
 multi_cyl = True
+time_step = np.linspace(0, time, delta_t)
+red_factor = 0.9
+
 
 # MESH DEFINITION
 dx = tol  # differential x
@@ -36,6 +40,7 @@ dEe = dx / 2
 dWw = dx / 2
 dSs = dy / 2
 dNn = dy / 2
+
 
 # NUMBER OF POINTS IN BOTH AXIS
 py = int(round((M + 2) / 2))
@@ -105,127 +110,144 @@ for j in range(px - int(r / dx), px + int(r / dx)):
                 as_[i, j] = 0
                 an[i, j] = 0
 
-# INITIALIZING VARIABLES
-PSI = (y * v) * M_fluid
-M_dens = M_dens * M_fluid
-differ = 1
-Iter = 0
-PSI_old = PSI.copy()
-iter_list = []
-dif_list = []
 
-# COEFFICIENT COMPUTATION
-while differ > max_difFer and Iter < max_iter:
+for t in range(len(time_step)):
+    # INITIALIZING VARIABLES
+
+    v = v * red_factor
+    PSI = (y * v) * M_fluid
+    M_dens = M_dens * M_fluid
+    differ = 1
+    Iter = 0
     PSI_old = PSI.copy()
+    iter_list = []
+    dif_list = []
+
+
+    # COEFFICIENT COMPUTATION
+
+    while differ > max_difFer and Iter < max_iter:
+        PSI_old = PSI.copy()
+        for i in range(1, M + 1):
+            for j in range(1, N + 1):
+                if M_fluid[i, j] == 1:
+                    # using the harmonic mean, calculate the ae coefficient (density dependent but for now dens is constant)
+                    ae[i, j] = ((dPE / ((dPe / (dens / M_dens[i, j])) + (dEe / (dens / M_dens[i, j + 1])))) * (dy / dPE))
+                    ind = np.isinf(ae)
+                    ae[ind] = 1
+                    ind = np.isnan(ae)
+                    ae[ind] = 1
+
+                    # using the harmonic mean, calculate the aw coefficient (density dependent but for now dens is constant)
+                    aw[i, j] = (dPW / ((dPw / (dens / M_dens[i, j])) + (dWw / (dens / M_dens[i, j - 1])))) * (dy / dPW)
+                    ind = np.isinf(aw)
+                    aw[ind] = 1
+                    ind = np.isnan(aw)
+                    aw[ind] = 1
+
+                    # using the harmonic mean, calculate the as coefficient (density dependent but for now dens is constant)
+                    as_[i, j] = (dPS / ((dPs / (dens / M_dens[i, j])) + (dSs / (dens / M_dens[i + 1, j])))) * (dx / dPS)
+                    ind = np.isinf(as_)
+                    as_[ind] = 1
+                    ind = np.isnan(as_)
+                    as_[ind] = 1
+
+                    # using the harmonic mean, calculate the an coefficient (density dependent but for now dens is constant)
+                    an[i, j] = (dPN / ((dPn / (dens / M_dens[i, j])) + (dNn / (dens / M_dens[i - 1, j])))) * (dx / dPN)
+                    ind = np.isinf(an)
+                    an[ind] = 1
+                    ind = np.isnan(an)
+                    an[ind] = 1
+
+                    # Falta ver como se calcula bP en los nodos internos y como se cambia la rotación
+                    # bP[i, j] = 0.8
+                    ap[i, j] = ae[i, j] + aw[i, j] + as_[i, j] + an[i, j]
+                    ind = np.isinf(ap)
+                    ap[ind] = 1
+                    ind = np.isnan(ap)
+                    ap[ind] = 1
+                else:
+                    ap[i, j] = 1
+                    ae[i, j] = 0
+                    aw[i, j] = 0
+                    as_[i, j] = 0
+                    an[i, j] = 0
+                    bP[i, j] = v * H / 2
+                PSI[i, j] = (ae[i, j] * PSI[i, j + 1] + aw[i, j] * PSI[i, j - 1] +
+                             an[i, j] * PSI[i - 1, j] + as_[i, j] * PSI[i + 1, j] + bP[i, j]) / ap[i, j]
+        Iter += 1
+        iter_list.append(Iter)
+        differ = np.max(np.max(np.abs(PSI_old - PSI)))
+        dif_list.append(differ)
+        print(Iter, ": ", differ)
+
+
+    # CHECK
+    PSI[:, -1] = PSI[:, -2]
+
+    vxP = np.zeros(M_fluid.shape)
+    vyP = np.zeros(M_fluid.shape)
+    vP = v * M_fluid
+    vxn = np.ones(M_fluid.shape)
+    vxs = np.ones(M_fluid.shape)
+    vye = np.ones(M_fluid.shape)
+    vyw = np.ones(M_fluid.shape)
+
+    # VELOCITY COMPUTATION
     for i in range(1, M + 1):
         for j in range(1, N + 1):
             if M_fluid[i, j] == 1:
-                # using the harmonic mean, calculate the ae coefficient (density dependent but for now dens is constant)
-                ae[i, j] = ((dPE / ((dPe / (dens / M_dens[i, j])) + (dEe / (dens / M_dens[i, j + 1])))) * (dy / dPE))
-                ind = np.isinf(ae)
-                ae[ind] = 1
-                ind = np.isnan(ae)
-                ae[ind] = 1
+                vxn = an[i, j] * ((PSI[i, j] - PSI[i - 1, j]) / dPN)
+                vxs = as_[i, j] * ((PSI[i + 1, j] - PSI[i, j]) / dPS)
+                vye = ae[i, j] * ((PSI[i, j + 1] - PSI[i, j]) / dPE)
+                vyw = aw[i, j] * ((PSI[i, j] - PSI[i, j - 1]) / dPW)
+                vxP[i, j] = -(vxn + vxs) / 2
+                vyP[i, j] = -(vye + vyw) / 2
+                vP[i, j] = np.sqrt(vxP[i, j] ** 2 + vyP[i, j] ** 2)
 
-                # using the harmonic mean, calculate the aw coefficient (density dependent but for now dens is constant)
-                aw[i, j] = (dPW / ((dPw / (dens / M_dens[i, j])) + (dWw / (dens / M_dens[i, j - 1])))) * (dy / dPW)
-                ind = np.isinf(aw)
-                aw[ind] = 1
-                ind = np.isnan(aw)
-                aw[ind] = 1
+    PSI = PSI * M_fluid
+    v_max = np.max(np.max(vP))
 
-                # using the harmonic mean, calculate the as coefficient (density dependent but for now dens is constant)
-                as_[i, j] = (dPS / ((dPs / (dens / M_dens[i, j])) + (dSs / (dens / M_dens[i + 1, j])))) * (dx / dPS)
-                ind = np.isinf(as_)
-                as_[ind] = 1
-                ind = np.isnan(as_)
-                as_[ind] = 1
+    #==========================================================================
+    # PLOT SECTION
 
-                # using the harmonic mean, calculate the an coefficient (density dependent but for now dens is constant)
-                an[i, j] = (dPN / ((dPn / (dens / M_dens[i, j])) + (dNn / (dens / M_dens[i - 1, j])))) * (dx / dPN)
-                ind = np.isinf(an)
-                an[ind] = 1
-                ind = np.isnan(an)
-                an[ind] = 1
-
-                # Falta ver como se calcula bP en los nodos internos y como se cambia la rotación
-                # bP[i, j] = 0.8
-                ap[i, j] = ae[i, j] + aw[i, j] + as_[i, j] + an[i, j]
-                ind = np.isinf(ap)
-                ap[ind] = 1
-                ind = np.isnan(ap)
-                ap[ind] = 1
-            else:
-                ap[i, j] = 1
-                ae[i, j] = 0
-                aw[i, j] = 0
-                as_[i, j] = 0
-                an[i, j] = 0
-                bP[i, j] = v * H / 2
-            PSI[i, j] = (ae[i, j] * PSI[i, j + 1] + aw[i, j] * PSI[i, j - 1] +
-                         an[i, j] * PSI[i - 1, j] + as_[i, j] * PSI[i + 1, j] + bP[i, j]) / ap[i, j]
-    Iter += 1
-    iter_list.append(Iter)
-    differ = np.max(np.max(np.abs(PSI_old - PSI)))
-    dif_list.append(differ)
-    print(Iter, ": ", differ)
-
-# CHECK
-PSI[:, -1] = PSI[:, -2]
-
-vxP = np.zeros(M_fluid.shape)
-vyP = np.zeros(M_fluid.shape)
-vP = v * M_fluid
-vxn = np.ones(M_fluid.shape)
-vxs = np.ones(M_fluid.shape)
-vye = np.ones(M_fluid.shape)
-vyw = np.ones(M_fluid.shape)
-
-# VELOCITY COMPUTATION
-for i in range(1, M + 1):
-    for j in range(1, N + 1):
-        if M_fluid[i, j] == 1:
-            vxn = an[i, j] * ((PSI[i, j] - PSI[i-1, j]) / dPN)
-            vxs = as_[i, j] * ((PSI[i+1, j] - PSI[i, j]) / dPS)
-            vye = ae[i, j] * ((PSI[i, j + 1] - PSI[i, j]) / dPE)
-            vyw = aw[i, j] * ((PSI[i, j] - PSI[i, j-1]) / dPW)
-            vxP[i, j] = -(vxn + vxs) / 2
-            vyP[i, j] = -(vye + vyw) / 2
-            vP[i, j] = np.sqrt(vxP[i, j] ** 2 + vyP[i, j] ** 2)
-
-PSI = PSI * M_fluid
-
-# PLOT SECTION
-plt.style.use("dark_background")
-
-'''plt.streamplot(x, y, vxP, vyP, color=vP, cmap='jet')
-plt.colorbar()
-plt.show()'''
-
-#solucionar el plot
-plt.imshow(vP, aspect='auto', interpolation='gaussian', cmap='inferno', alpha=0.7)
-plt.quiver(x, y, vxP, vyP, color='w', alpha=1, angles='xy')
-plt.show()
+    # STREAMLINE PLOT
+    mask = np.flipud(vxP != 0) | np.flipud(vyP != 0)
+    '''plt.streamplot(x[mask], y[mask], (vxP)[mask], (vyP)[mask],
+                   density=1, color='w', linewidth=1, arrowsize=1)'''
+    plt.style.use("dark_background")
 
 
+    # VELOCITY FIELD
+    img1 = plt.imshow(vP, aspect='auto', interpolation='gaussian', cmap='inferno', alpha=1, vmax=8)
+    plt.quiver(x[mask], y[mask], np.flipud(vxP)[mask], np.flipud(vyP)[mask], color='w', alpha=1, scale=100)
+    plt.colorbar(img1, label="velocity")
+    plt.xlabel('L (m)')
+    plt.ylabel('H (m)')
+    plt.title("VELOCITY FIELD, Vmax=" + str("{:.2f}".format(v_max)) + "m/s " + "  Time-Step: " + str(t))
+    plt.autoscale()
+    plt.savefig(str(t)+'.png', dpi=300)
+    plt.clf()
+    #plt.show()
+
+
+# STREAM FUNCTION PSI
 plt.imshow(PSI, aspect='auto', interpolation='gaussian', cmap='inferno')
 plt.autoscale()
 plt.colorbar()
 plt.xlabel('Control Volumes')
 plt.show()
 
+
+# FLUIDITY MATRIX
 plt.imshow(M_fluid, aspect='auto', interpolation='none', cmap='autumn')
 plt.autoscale()
 plt.colorbar()
 plt.xlabel('Control Volumes')
 plt.show()
 
-plt.imshow(vyP, aspect='auto', interpolation='none', cmap='autumn')
-plt.autoscale()
-plt.colorbar()
-plt.xlabel('Control Volumes')
-plt.show()
 
+# PLOT OF CONVERGENCE
 plt.plot(iter_list, dif_list)
 plt.xlabel('Iterations')
 plt.ylabel('Error')
