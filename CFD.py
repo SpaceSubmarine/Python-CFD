@@ -6,7 +6,7 @@ r = 3  # radius in (m)
 dens = 1025  # density of the seawater
 H = 20  # height of the chanel in (m)
 L = 50  # longitude of the chanel in (m)
-tol = 0.5  # tolerance of the mesh
+tol = 0.6  # tolerance of the mesh
 v_in = 2  # inlet velocity (m/s) in x-axis
 max_iter = 100  # maximum number of iterations in the gauss-seidel
 max_difFer = 1e-6
@@ -225,9 +225,9 @@ for t in range(len(time_step)):
     print(np.shape(vP), ": ", np.shape(x))
     # VELOCITY FIELD
 
-    img1 = plt.imshow(vP, aspect='auto', interpolation='gaussian', cmap='turbo', alpha=1, vmax=8)
+    img1 = plt.imshow(vP, aspect='auto', interpolation='gaussian', cmap='jet', alpha=1, vmax=7)
     plt.axis(img1.get_extent())
-    plt.quiver(shape_grid_x[mask_x], shape_grid_y[mask_y], np.flipud(vxP)[mask_x], np.flipud(vyP)[mask_y], color='w', alpha=0.5)
+    plt.quiver(shape_grid_x[mask_x], shape_grid_y[mask_y], np.flipud(vxP)[mask_x], np.flipud(vyP)[mask_y], color='w', alpha=0.5, scale=50)
     plt.gca().set_aspect('equal', adjustable='box')
     plt.autoscale()
     plt.colorbar(img1, label="velocity")
