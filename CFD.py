@@ -2,8 +2,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # INPUT SECTION
-r = 6  # radius in (m)
-dens = 1025  # density of the seawater
+r = 3  # radius in (m)
+dens = 500  # density of the seawater
 H = 20  # height of the chanel in (m)
 L = 50  # longitude of the chanel in (m)
 tol = 0.4  # tolerance of the mesh
@@ -11,10 +11,10 @@ v_in = 2  # inlet velocity (m/s) in x-axis
 max_iter = 2000  # maximum number of iterations in the gauss-seidel
 max_difFer = 1e-6
 time = 10  # sec
-delta_t = 100  # number of divisions
-multi_cyl = False
+delta_t = 20  # number of divisions
+multi_cyl = True
 time_step = np.linspace(0, time, delta_t)
-red_factor = 0.9
+red_factor = 0.95
 
 
 # MESH DEFINITION
@@ -190,7 +190,7 @@ for t in range(len(time_step)):
         iter_list.append(Iter)
         differ = np.max(np.max(np.abs(PSI_old - PSI)))
         dif_list.append(differ)
-        print("Time-step: ", t, " Iterations: ", Iter, " Error: ", "{:.2f}".format(differ))
+        print("Time-step: ", t, " Iterations: ", Iter, " Error: ", "{:.7f}".format(differ))
 
     PSI[:, -1] = PSI[:, -2]
 
@@ -240,11 +240,11 @@ for t in range(len(time_step)):
 
     # VELOCITY FIELD =========================================================================
     # STREAMPLOT
-    img0 = plt.streamplot(np.flipud(shape_grid_x),  np.flipud(shape_grid_y), np.flipud(vxP), np.flipud(vyP), density=4,
-                          linewidth=0.18, arrowsize=0.2, color=np.flipud(vxP), cmap="inferno")  # color=vxP
+    img0 = plt.streamplot(np.flipud(shape_grid_x),  np.flipud(shape_grid_y), np.flipud(vxP), np.flipud(vyP), density=8,
+                          linewidth=0.18, arrowsize=0.2, color=np.flipud(vxP), cmap="autumn")  # color=vxP
     plt.colorbar(label="Velocity (m/s)", shrink=0.6)
-    plt.xlabel('N control volumes')
-    plt.ylabel('M control volumes, Iter: ' + str(Iter))
+    plt.xlabel('N control volumes, Iter: ' + str(Iter))
+    plt.ylabel('M control volumes')
     plt.title("VELOCITY FIELD  Vmax=" + str("{:.2f}".format(v_max)) + "m/s " + "  Time-Step: " + str(t))
     plt.autoscale()
     plt.gca().set_aspect('equal', adjustable='box')
@@ -255,12 +255,12 @@ for t in range(len(time_step)):
     img1 = plt.imshow(vP, aspect='auto', interpolation='gaussian', cmap='inferno', alpha=1, vmax=max_max_v)
     plt.axis(img1.get_extent())
     plt.quiver(shape_grid_x[mask_x], shape_grid_y[mask_y], np.flipud(vxP)[mask_x], np.flipud(vyP)[mask_y], color='w',
-               alpha=0.6, scale=200, width=0.0005)
+               alpha=0.56, scale=250, width=0.0005)
     plt.gca().set_aspect('equal', adjustable='box')
     plt.autoscale()
     plt.colorbar(img1, label="Velocity (m/s)", shrink=0.6)
-    plt.xlabel('N control volumes')
-    plt.ylabel('M control volumes, Iter: ' + str(Iter))
+    plt.xlabel('N control volumes, Iter: ' + str(Iter))
+    plt.ylabel('M control volumes')
     plt.title("VELOCITY FIELD  Vmax=" + str("{:.2f}".format(v_max)) + "m/s " + "  Time-Step: " + str(t))
     plt.savefig('1_' + str(t) + '.png', dpi=600)
     plt.clf()
@@ -269,18 +269,18 @@ for t in range(len(time_step)):
     img2 = plt.imshow(vP, aspect='auto', interpolation='gaussian', cmap='jet', alpha=1, vmax=max_max_v)
     plt.axis(img1.get_extent())
     plt.quiver(shape_grid_x[mask_x], shape_grid_y[mask_y], np.flipud(vxP)[mask_x], np.flipud(vyP)[mask_y], color='k',
-               alpha=0.65, scale=200, width=0.0008)
+               alpha=0.55, scale=250, width=0.0008)
     plt.gca().set_aspect('equal', adjustable='box')
     plt.autoscale()
     plt.colorbar(img2, label="Velocity (m/s)", shrink=0.6)
-    plt.xlabel('N control volumes')
-    plt.ylabel('M control volumes, Iter: ' + str(Iter))
+    plt.xlabel('N control volumes, Iter: ' + str(Iter))
+    plt.ylabel('M control volumes')
     plt.title("VELOCITY FIELD  Vmax=" + str("{:.2f}".format(v_max)) + "m/s " + "  Time-Step: " + str(t))
     plt.savefig('2_' + str(t) + '.png', dpi=600)
     plt.clf()
 
     # PLOT OF CONVERGENCE
-    img3 = plt.stackplot(iter_list, dif_list, colors="blue")
+    img3 = plt.plot(iter_list, dif_list, c="green")
     plt.xlabel('Iterations')
     plt.ylabel('Error')
     plt.savefig('3_' + str(t) + '.png', dpi=600)
